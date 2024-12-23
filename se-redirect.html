@@ -1,0 +1,152 @@
+<head>
+	<title>SnapEnhance Latest Build Redirector</title>
+	<style>
+		body {
+			background-color: #111111;
+			color: #ffffff;
+			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+		}
+
+		.broadcast {
+			text-align: center;
+		}
+
+		.broadcast:link {
+			color: #555555;
+		}
+
+		.footer {
+			text-align: center;
+			color: #3d3d3d;
+		}
+
+		.footer:link {
+			color: #555555;
+		}
+
+		div > div {
+			padding: 10px;
+			background-color: #303030;
+			color: #ffffff;
+		}
+	</style>
+	<script>
+		class Redirector {
+			static s_RepoOwner = "rhunk";
+			static s_RepoName = "SnapEnhance";
+			
+			static async getLatestRunId() {
+				try {
+					const response = await fetch(`https://api.github.com/repos/${Redirector.s_RepoOwner}/${Redirector.s_RepoName}/actions/runs?event=workflow_dispatch`);
+					
+					if (!response.ok) {
+						return {
+							success: false,
+							data: `Non successful HTTP status code: ${response.status}`
+						};
+					}
+					
+					const data = await response.json();
+					
+					if (!data.hasOwnProperty("workflow_runs")) {
+						return {
+							success: false,
+							data: `"workflow_runs" not present`
+						};
+					}
+
+					let latestDebug = null;
+					for (let x = 0; x < data.workflow_runs.length; x++) {
+						const run = data.workflow_runs[x];
+						if (run.conclusion == "success" && run.path == ".github/workflows/debug.yml") {
+							latestDebug = run;
+							break;
+						}
+					}
+
+					if (latestDebug == null) {
+						return {
+							success: false,
+							data: `No debug CI runs found`
+						};
+					}
+
+					if (!latestDebug.hasOwnProperty("head_sha") || latestDebug.head_sha == null || latestDebug.head_sha == undefined) {
+						return {
+							success: false,
+							data: `"head_sha" not present`
+						};
+					}
+					
+					return {
+						success: true,
+						data: {
+							versionName: latestDebug.head_sha.substring(0, 7) + "-debug",
+							releaseUrl: latestDebug.html_url.replace("github.com", "nightly.link")
+						}
+					};
+				} catch (error) {
+					return {
+						success: false,
+						data: `Error fetching data: ${error}`
+					};
+				}
+			}
+
+			static async init(elementId) {
+				const elem = document.getElementById(elementId);
+				const obtainedId = await Redirector.getLatestRunId();
+				if (obtainedId.success) {
+					let currentElem = null;
+
+					currentElem = document.createElement("span");
+					currentElem.textContent = "Redirecting now to version ";
+					elem.appendChild(currentElem);
+					
+					currentElem = document.createElement("span");
+					currentElem.textContent = obtainedId.data.versionName;
+					currentElem.style.color = "#ff00ff";
+					elem.appendChild(currentElem);
+					
+					elem.appendChild(document.createElement("br"));
+
+					currentElem = document.createElement("span");
+					currentElem.textContent = "If you aren't redirected, click ";
+					currentElem.style.color = "#a0a0a0";
+					elem.appendChild(currentElem);
+					
+					currentElem = document.createElement("a");
+					currentElem.textContent = "here";
+					currentElem.style.color = "#a000a0";
+					currentElem.href = obtainedId.data.releaseUrl;
+					elem.appendChild(currentElem);
+
+					currentElem = document.createElement("span");
+					currentElem.textContent = ".";
+					currentElem.style.color = "#a0a0a0";
+					elem.appendChild(currentElem);
+
+					setTimeout(function() {
+						window.location.href = obtainedId.data.releaseUrl;
+					}, 250);
+				} else {
+					elem.style.color = "#ff0000";
+					elem.textContent = obtainedId.data;
+				}
+			}
+		}
+	</script>
+</head>
+<body>
+	<p class="broadcast">
+		Welcome to the SnapEnhance redirector. <br/>
+		This page exists simply to obtain the latest build and give you the nightly link.
+	</p>
+	<div id="r_text" style="text-align:center;"></div>
+	<script>
+		Redirector.init("r_text");
+	</script>
+	<p class="footer">
+		&copy; Zero Mods 2019 - 2024
+	</p>
+</body>
